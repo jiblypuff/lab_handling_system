@@ -19,7 +19,7 @@ while(True):
 
     # print(dim)
 
-    cv2.imwrite("before"+str(count)+".jpg", frame)
+    # cv2.imwrite("before"+str(count)+".jpg", frame)
     # cv2.waitKey(0)
 
     frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
@@ -48,7 +48,7 @@ while(True):
 
     frame = cv2.GaussianBlur(frame, (21,21), 2)
 
-    cv2.imwrite("filtered_enhanced"+str(count)+".jpg", frame)
+    # cv2.imwrite("filtered_enhanced"+str(count)+".jpg", frame)
 
     img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     thresh = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
@@ -96,7 +96,9 @@ while(True):
 
 
     cv2.drawContours(frame_copy, conts_final, -1, (0, 255, 0), 2, cv2.LINE_AA)
-    cv2.imwrite("test"+str(count)+".jpg", frame_copy)
+    cv2.imshow("frame"+str(count), frame_copy)
+    cv2.waitKey(0);
+    # cv2.imwrite("test"+str(count)+".jpg", frame_copy)
     # cv2.waitKey(0)
 
 
