@@ -168,7 +168,7 @@ while(True):
 
         if(len(areas) != 0):
             for i in range(len(areas)):
-                if(sorted_conts[i][1]['area'] * 100 > sorted_conts[0][1]['area']
+                if(sorted_conts[i][1]['area'] * 400 > sorted_conts[0][1]['area']
                    and sorted_conts[i][1]['area'] * 2 < sorted_conts[0][1]['area']):
                     center_X = sorted_conts[i][1]['center'][0]
                     center_Y = sorted_conts[i][1]['center'][1]
