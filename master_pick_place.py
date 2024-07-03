@@ -181,8 +181,8 @@ while(True):
         print(dexarm.get_current_position())
         
         if (area_num > 0):
-           object_found = True
-           state = 2
+            object_found = True
+            state = 2
         elif (not object_found):
             rotate_angle(-1)
             time.sleep(0.25)
