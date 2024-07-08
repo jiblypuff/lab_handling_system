@@ -3,24 +3,39 @@ import numpy as np
 import os
 
 
-def img_to_polygons(image, outputDir, threshold = 400, ):
+def img_to_polygons(image):
     cordnt_list = []
     centers_list = []
     areas_list = []
+    rec_list = []
     
     frame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    frame = cv2.GaussianBlur(frame, (9,9), 0)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    frame = clahe.apply(frame)
 
-    edges = cv2.Canny(frame, 50, 150)
+    # frame = cv2.GaussianBlur(frame, (21,21), 0)
+    frame = cv2.bilateralFilter(frame,5,75,75)
 
-    frame = cv2.adaptiveThreshold(edges, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    high_thresh, thresh_im = cv2.threshold(frame, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    lowThresh = 0.5*high_thresh
+
+    frame = cv2.Canny(frame, 50, 150)
+
+    frame = cv2.adaptiveThreshold(frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+
+    # frame = cv2.bilateralFilter(frame,5,150,150)
+
+    # high_thresh, thresh_im = cv2.threshold(frame, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # lowThresh = 0.5*high_thresh
+
+    # frame = cv2.Canny(frame, 50, 150)
 
     out = os.path.join(outPut_dir, "edges.jpg")
 
     cv2.imwrite(out, frame)
 
-    contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    contours, hierarchy = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
     if not contours:
         return cordnt_list, centers_list
@@ -30,25 +45,31 @@ def img_to_polygons(image, outputDir, threshold = 400, ):
 
     # Extract coordinates of white regions
     for contour in contours:
+        # epsilon = 0.5*cv2.arcLength(contour,True)
+        # contour = cv2.approxPolyDP(contour,epsilon,True)
         area = cv2.contourArea(contour)
 
         # Filter based on the area conditions
-        if True:
+        if area > 300:
             coordinates = contour.squeeze().astype(float).tolist()
             if len(coordinates) > 2:
                 M = cv2.moments(contour)
                 cX = int(M["m10"] / (M["m00"] + 1e-5))
                 cY = int(M["m01"] / (M["m00"] + 1e-5))
                 
-                crdnts = [{'x': i[0], 'y': i[1]} for i in coordinates]
-                cordnt_list.append(crdnts)
+                # crdnts = [{'x': i[0], 'y': i[1]} for i in coordinates]
+                # rect = {}
+                # for i in cv2.boundingRect(contour):
+                #     rect = {'x': i[0], 'y': i[1], 'w': i[2], 'h': i[3]} 
+                # cordnt_list.append(crdnts)
+                rec_list.append(cv2.boundingRect(contour))
                 centers_list.append({'x': cX, 'y': cY})
                 areas_list.append(area)
                     
 
     # tup = (len(cordnt_list), len(centers_list), len(areas_list))
     # print(tup)
-    return cordnt_list, centers_list, areas_list
+    return rec_list, centers_list, areas_list
 
 count = 0
 center_X = 0
@@ -59,12 +80,17 @@ path = os.getcwd()
 outPut_dir = os.path.join(path, 'output')
 os.makedirs(outPut_dir, exist_ok=True)
 
+vid = cv2.VideoCapture('videos/vid3.mov')
+
 while(True):
 
-    vid = cv2.VideoCapture(0)
     ret, frame = vid.read()
 
-    scale_percent = 50
+    if not ret:
+        print("video ended")
+        break
+
+    scale_percent = 100
     width = int(frame.shape[1] * scale_percent / 100)
     height = int(frame.shape[0] * scale_percent / 100)
     dim = (width, height)
@@ -77,7 +103,7 @@ while(True):
     fout = os.path.join(outPut_dir, "stream.jpg")
 
     # Extract polygons from the image
-    polygons, centers, areas = img_to_polygons(frame_copy, outPut_dir)
+    rect, centers, areas = img_to_polygons(frame_copy)
 
     # Get the height and width of the image
     height, width = frame_copy.shape[:2]
@@ -86,19 +112,25 @@ while(True):
     # black_image = np.zeros((height, width, 3), dtype=np.uint8)
 
     # Draw polygons on the black image
-    for i, ply in enumerate(polygons):
-        ply_list = [[pnt['x'], pnt['y']] for pnt in ply]
+    for i, rec in enumerate(rect):
+        # ply_list = [[pnt['x'], pnt['y']] for pnt in ply]
 
         # Define the vertices of the polygon
-        vertices = np.array(ply_list, dtype=np.int32)
+        # vertices = np.array(ply_list, dtype=np.int32)
 
         cX = centers[i]['x']
         cY = centers[i]['y']
         # Draw the polygon on the black image
-        cv2.polylines(frame_copy, [vertices], isClosed=True, color=(0, 255, 0), thickness=2)
-        cv2.circle(frame_copy, (cX, cY), 7, (255, 255, 255), -1)
-        cv2.putText(frame_copy, "area="+str(areas[i]), (cX - 20, cY - 20), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        # cv2.polylines(frame_copy, [vertices], isClosed=True, color=(0, 255, 0), thickness=2)
+        x,y,w,h = rec
+        ar = w*h
+        if ar > 3200 and ar < 300000:
+            cv2.rectangle(frame_copy,(x,y),(x+w,y+h),(0,255,0),2)
+            cv2.circle(frame_copy, (cX, cY), 7, (255, 255, 255), -1)
+            cv2.putText(frame_copy, "area="+str(ar), (cX - 20, cY - 20), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
     # Save the output image
     cv2.imwrite(fout, frame_copy)
+
+    input()
