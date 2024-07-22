@@ -6,6 +6,8 @@ from pydexarm import Dexarm
 import math
 import time
 
+import yolo
+
 z_search = 110
 
 # define a dexarm object to control the Dexarm
@@ -16,7 +18,7 @@ dexarm.move_to(curr_pos[0], curr_pos[1], z_search)
 dexarm.soft_gripper_nature()
 
 # define a video capture object
-vid = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+vid = cv2.VideoCapture(0)
 
 state = 1
 # represents the center of the object to be picked and placed
@@ -111,6 +113,10 @@ def valid_location(drop_x, drop_y):
     else:
         return True
     
+prev_X = -1
+prev_Y = -1
+prev_dist = -1
+wait_count = 0
 
 while(True):
 
@@ -123,64 +129,78 @@ while(True):
     elif state == 1:
         # Capture the video frame
         # by frame
-        ret, frame = vid.read()
+        # ret, frame = vid.read()
 
-        print("Object found: " + str(object_found))
+        # print("Object found: " + str(object_found))
 
         # print('Original Dimensions: ', frame.shape)
         
-        scale_percent = 100
-        width = int(frame.shape[1] * scale_percent / 100)
-        height = int(frame.shape[0] * scale_percent / 100)
-        dim = (width, height)
+        # scale_percent = 100
+        # width = int(frame.shape[1] * scale_percent / 100)
+        # height = int(frame.shape[0] * scale_percent / 100)
+        # dim = (width, height)
 
-        frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
-        frame = cv2.medianBlur(frame, 11)
+        # frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+        # frame = cv2.medianBlur(frame, 11)
         
-        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        thresh = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        # img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # thresh = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
-        contours, hiearchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        frame_copy = frame.copy()
+        # contours, hiearchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # frame_copy = frame.copy()
 
-        areas = []
-        centers = []
+        # areas = []
+        # centers = []
 
-        for c in contours:
-            # find the area of the contour
-            areas.append(cv2.contourArea(c))
-            # compute the center of the contour
-            M = cv2.moments(c)
-            cX = int(M["m10"] / (M["m00"] + 1e-5))
-            cY = int(M["m01"] / (M["m00"] + 1e-5))
+        # for c in contours:
+        #     # find the area of the contour
+        #     areas.append(cv2.contourArea(c))
+        #     # compute the center of the contour
+        #     M = cv2.moments(c)
+        #     cX = int(M["m10"] / (M["m00"] + 1e-5))
+        #     cY = int(M["m01"] / (M["m00"] + 1e-5))
 
-            centers.append((cX, cY))
+        #     centers.append((cX, cY))
 
-        all_conts = {}
+        # all_conts = {}
 
-        for i in range(len(areas)):
-            all_conts[i] = {'area' : areas[i], 'center' : centers[i]}
+        # for i in range(len(areas)):
+        #     all_conts[i] = {'area' : areas[i], 'center' : centers[i]}
 
-        sorted_conts = sorted(all_conts.items(), key = lambda x:x[1]["area"], reverse = True)
+        # sorted_conts = sorted(all_conts.items(), key = lambda x:x[1]["area"], reverse = True)
 
 
-        area_num = 0
+        # area_num = 0
 
-        if(len(areas) != 0):
-            for i in range(len(areas)):
-                if(sorted_conts[i][1]['area'] * 400 > sorted_conts[0][1]['area']
-                   and sorted_conts[i][1]['area'] * 2 < sorted_conts[0][1]['area']):
-                    center_X = sorted_conts[i][1]['center'][0]
-                    center_Y = sorted_conts[i][1]['center'][1]
-                    cv2.drawContours(frame_copy, contours, sorted_conts[i][0], (0, 255, 0), 2, cv2.LINE_AA)
-                    area_num = area_num + 1
+        # if(len(areas) != 0):
+        #     for i in range(len(areas)):
+        #         if(sorted_conts[i][1]['area'] * 400 > sorted_conts[0][1]['area']
+        #            and sorted_conts[i][1]['area'] * 2 < sorted_conts[0][1]['area']):
+        #             center_X = sorted_conts[i][1]['center'][0]
+        #             center_Y = sorted_conts[i][1]['center'][1]
+        #             cv2.drawContours(frame_copy, contours, sorted_conts[i][0], (0, 255, 0), 2, cv2.LINE_AA)
+        #             area_num = area_num + 1
 
-        cv2.imshow("Contour Drawing", frame_copy)
-        print("CenterX: " + str(center_X))
-        print("CenterY: " + str(center_Y))
-        print(dexarm.get_current_position())
+        # cv2.imshow("Contour Drawing", frame_copy)
+        # print("CenterX: " + str(center_X))
+        # print("CenterY: " + str(center_Y))
+        # print(dexarm.get_current_position())
+
+        # get center and dist of object closest to center
+        center_X, center_Y, dist = yolo.getClosestObject(vid)
+
+        # -- some unfinished logic to protect against if the detection cuts out for a few frames
+        # if prev_X != -1:
+        #     if (center_X == -1) or dist - prev_dist > 300 and count < 10:
+        #         center_X = prev_X
+        #         center_Y = prev_Y
+        #         count += 1
+
+        # prev_X = center_X
+        # prev_Y = center_Y
+        # prev_dist = dist
         
-        if (area_num > 0):
+        if (center_X != -1):
            object_found = True
            state = 2
         elif (not object_found):

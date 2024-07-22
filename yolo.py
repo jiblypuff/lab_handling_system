@@ -1,43 +1,43 @@
 import cv2
 from ultralytics import YOLOv10
 import supervision as sv
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Load the YOLOv10 model
 model = YOLOv10('/Users/jibly/Documents/labHandling/lab_handling_system/models/best.pt')
 
-# Open a connection to the video stream (0 is the default camera)
-cap = cv2.VideoCapture('/Users/jibly/Documents/labHandling/lab_handling_system/videos/vid2.mov')
+# cap = cv2.VideoCapture('/Users/jibly/Documents/labHandling/lab_handling_system/videos/vid2.mov')
+# cap = cv2.VideoCapture(0)
 
-if not cap.isOpened():
-    print("Error: Could not open video stream.")
-    exit()
+# if not cap.isOpened():
+#     print("Error: Could not open video stream.")
+#     exit()
 
 bounding_box_annotator = sv.BoundingBoxAnnotator()
 label_annotator = sv.LabelAnnotator()
 
-frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-fps = int(cap.get(cv2.CAP_PROP_FPS))
-frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+# frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+# frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+# fps = int(cap.get(cv2.CAP_PROP_FPS))
+# frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 output_video_path = '/Users/jibly/Documents/labHandling/lab_handling_system/output/pred.mp4'
 
 # Define the codec and create a VideoWriter object
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID' for .avi format
-out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+# fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID' for .avi format
+# out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
 
-# Process the video stream frame by frame
-while True:
+# return center and distance of object closest to center of frame
+def getClosestObject(cap):
     ret, frame = cap.read()
     
     if not ret:
         print("Error: Could not read frame.")
-        break
+        return (-1, -1), -1
 
-    # Perform inference on the frame
-    # results = model(frame)
-
-    results = model(frame, conf=0.25)[0]
+    results = model(frame, conf=0.3)[0]
+    
     detections = sv.Detections.from_ultralytics(results)
 
     annotated_image = bounding_box_annotator.annotate(
@@ -45,23 +45,41 @@ while True:
     annotated_image = label_annotator.annotate(
         scene=annotated_image, detections=detections)
     
-    # out.write(annotated_image)
+    # exit if no objects are detected
+    if(len(detections) == 0): 
+        print("no detections")
+        return (-1, -1), -1
 
-    # sv.plot_image(annotated_image)
+    img_center = np.asarray(annotated_image.shape[:2]) / 2
+    # print(img_center)
+    cv2.circle(annotated_image, (int(img_center[1]), int(img_center[0])), 12, (255, 0, 0), -1)
+    cv2.putText(annotated_image, "center", (int(img_center[1]) - 20, int(img_center[0]) - 20), 
+    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+    min_dist = float('inf')
+    closest_cent = (-1, -1)
+    for box in detections:
+        # print(box)
+        cx = (box[0][2] + box[0][0]) / 2 
+        cy = (box[0][3] + box[0][1]) / 2
+
+        cur_dist = np.sqrt((cx - img_center[1])**2 + (cy-img_center[0])**2)
+        if(cur_dist < min_dist):
+            min_dist = cur_dist
+            closest_cent = (int(cx),int(cy))
+
+    cv2.circle(annotated_image, closest_cent, 7, (255, 255, 255), -1)
+    cv2.putText(annotated_image, "conf="+str(box[2]), (int(cx) - 20, int(cy) - 20), 
+    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    
     cv2.imwrite('/Users/jibly/Documents/labHandling/lab_handling_system/output/stream.jpg', annotated_image)
-
     
-    # Annotate the frame with results
-    # annotated_frame = results[0].render()
-    
-    # # Display the frame with annotations
-    # cv2.imshow('YOLOv10 Object Detection', annotated_frame)
-    
-    # Exit if 'q' is pressed
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    return closest_cent, min_dist
+    # # Exit if 'q' is pressed
+    # if cv2.waitKey(1) & 0xFF == ord('q'):
+    #     return
 
 # Release the video stream and close windows
-cap.release()
-out.release()
-cv2.destroyAllWindows()
+# cap.release()
+# out.release()
+# cv2.destroyAllWindows()
