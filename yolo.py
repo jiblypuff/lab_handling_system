@@ -8,11 +8,11 @@ import matplotlib.pyplot as plt
 model = YOLOv10('/Users/jibly/Documents/labHandling/lab_handling_system/models/best.pt')
 
 # cap = cv2.VideoCapture('/Users/jibly/Documents/labHandling/lab_handling_system/videos/vid2.mov')
-# cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0)
 
-# if not cap.isOpened():
-#     print("Error: Could not open video stream.")
-#     exit()
+if not cap.isOpened():
+    print("Error: Could not open video stream.")
+    exit()
 
 bounding_box_annotator = sv.BoundingBoxAnnotator()
 label_annotator = sv.LabelAnnotator()
@@ -30,11 +30,13 @@ output_video_path = '/Users/jibly/Documents/labHandling/lab_handling_system/outp
 
 # return center and distance of object closest to center of frame
 def getClosestObject(cap):
+# while True:
     ret, frame = cap.read()
     
     if not ret:
         print("Error: Could not read frame.")
-        return (-1, -1), -1
+        # break
+        return -1, -1, -1
 
     results = model(frame, conf=0.3)[0]
     
@@ -48,7 +50,7 @@ def getClosestObject(cap):
     # exit if no objects are detected
     if(len(detections) == 0): 
         print("no detections")
-        return (-1, -1), -1
+        return -1, -1, -1
 
     img_center = np.asarray(annotated_image.shape[:2]) / 2
     # print(img_center)
@@ -58,6 +60,7 @@ def getClosestObject(cap):
 
     min_dist = float('inf')
     closest_cent = (-1, -1)
+    conf = -1
     for box in detections:
         # print(box)
         cx = (box[0][2] + box[0][0]) / 2 
@@ -67,14 +70,15 @@ def getClosestObject(cap):
         if(cur_dist < min_dist):
             min_dist = cur_dist
             closest_cent = (int(cx),int(cy))
+            conf = box[2]
 
     cv2.circle(annotated_image, closest_cent, 7, (255, 255, 255), -1)
-    cv2.putText(annotated_image, "conf="+str(box[2]), (int(cx) - 20, int(cy) - 20), 
+    cv2.putText(annotated_image, "conf="+str(conf), (int(closest_cent[0]) - 20, int(closest_cent[1]) - 20), 
     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
     
     cv2.imwrite('/Users/jibly/Documents/labHandling/lab_handling_system/output/stream.jpg', annotated_image)
     
-    return closest_cent, min_dist
+    return closest_cent[0], closest_cent[1], min_dist
     # # Exit if 'q' is pressed
     # if cv2.waitKey(1) & 0xFF == ord('q'):
     #     return

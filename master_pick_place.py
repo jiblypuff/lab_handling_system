@@ -11,7 +11,7 @@ import yolo
 z_search = 110
 
 # define a dexarm object to control the Dexarm
-dexarm = Dexarm("COM3")
+dexarm = Dexarm("/dev/tty.usbmodem2078399E47531")
 dexarm.go_home()
 curr_pos = dexarm.get_current_position()
 dexarm.move_to(curr_pos[0], curr_pos[1], z_search)
@@ -25,10 +25,10 @@ state = 1
 center_X = 0
 center_Y = 0
 # represents where the object needs to be located in the frame to be picked properly
-goal_x = 322
-goal_y = 405
+goal_x = 1001
+goal_y = 350
 # represents the height where the air picker will be just above the table surface
-z_table = -52
+z_table = -100
 # represents the height at which the arm will traverse across the table
 z_trav = 50
 
@@ -119,6 +119,7 @@ prev_dist = -1
 wait_count = 0
 
 while(True):
+    print("state="+str(state))
 
     # the 'q' button is set as the
     # quitting button you may use any
