@@ -3,16 +3,17 @@ from ultralytics import YOLOv10
 import supervision as sv
 import numpy as np
 import matplotlib.pyplot as plt
+from fisheye import unwarp
 
 # Load the YOLOv10 model
 model = YOLOv10('/Users/jibly/Documents/labHandling/lab_handling_system/models/best.pt')
 
 # cap = cv2.VideoCapture('/Users/jibly/Documents/labHandling/lab_handling_system/videos/vid2.mov')
-cap = cv2.VideoCapture(0)
+# cap = cv2.VideoCapture(0)
 
-if not cap.isOpened():
-    print("Error: Could not open video stream.")
-    exit()
+# if not cap.isOpened():
+#     print("Error: Could not open video stream.")
+#     exit()
 
 bounding_box_annotator = sv.BoundingBoxAnnotator()
 label_annotator = sv.LabelAnnotator()
@@ -23,6 +24,22 @@ label_annotator = sv.LabelAnnotator()
 # frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 output_video_path = '/Users/jibly/Documents/labHandling/lab_handling_system/output/pred.mp4'
+
+# mtx = np.array([[906.55114597,  -2.30814081,     719.28355776],
+#                 [0.,            902.56494318,   477.55878025],
+#                 [0.,            0.,           1.        ]])
+# dist = np.array([[-0.46650992],
+#                 [ 1.88436159],
+#                 [-0.76346618],
+#                 [-0.87372484]])
+
+
+
+goal_x = 1001
+goal_y = 310
+
+
+
 
 # Define the codec and create a VideoWriter object
 # fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID' for .avi format
@@ -37,6 +54,12 @@ def getClosestObject(cap):
         print("Error: Could not read frame.")
         # break
         return -1, -1, -1
+    
+    #----TODO
+    # undisotort the image before pasing thru yolo
+    cv2.imwrite('/Users/jibly/Documents/labHandling/lab_handling_system/output/original.jpg', frame)
+    frame = unwarp(frame)
+
 
     results = model(frame, conf=0.3)[0]
     
@@ -54,8 +77,8 @@ def getClosestObject(cap):
 
     img_center = np.asarray(annotated_image.shape[:2]) / 2
     # print(img_center)
-    cv2.circle(annotated_image, (int(img_center[1]), int(img_center[0])), 12, (255, 0, 0), -1)
-    cv2.putText(annotated_image, "center", (int(img_center[1]) - 20, int(img_center[0]) - 20), 
+    cv2.circle(annotated_image, (goal_x, goal_y), 12, (255, 0, 0), -1)
+    cv2.putText(annotated_image, "goal", (goal_x - 20, goal_y - 20), 
     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     min_dist = float('inf')
@@ -66,7 +89,7 @@ def getClosestObject(cap):
         cx = (box[0][2] + box[0][0]) / 2 
         cy = (box[0][3] + box[0][1]) / 2
 
-        cur_dist = np.sqrt((cx - img_center[1])**2 + (cy-img_center[0])**2)
+        cur_dist = np.sqrt((cx - goal_x)**2 + (cy-goal_y)**2)
         if(cur_dist < min_dist):
             min_dist = cur_dist
             closest_cent = (int(cx),int(cy))

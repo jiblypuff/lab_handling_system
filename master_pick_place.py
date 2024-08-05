@@ -14,6 +14,7 @@ z_search = 110
 dexarm = Dexarm("/dev/tty.usbmodem2078399E47531")
 dexarm.go_home()
 curr_pos = dexarm.get_current_position()
+print('HOME: ', curr_pos)
 dexarm.move_to(curr_pos[0], curr_pos[1], z_search)
 dexarm.soft_gripper_nature()
 
@@ -26,16 +27,16 @@ center_X = 0
 center_Y = 0
 # represents where the object needs to be located in the frame to be picked properly
 goal_x = 1001
-goal_y = 350
+goal_y = 310
 # represents the height where the air picker will be just above the table surface
-z_table = -100
+z_table = -110
 # represents the height at which the arm will traverse across the table
 z_trav = 50
 
 # search rad
 search_rad = 300
 
-error_bound = 8
+error_bound = 25
 object_found = False
 count = 0
 
@@ -43,6 +44,11 @@ x_lower_lim = -395
 x_upper_lim = 395
 y_lower_lim = 0
 y_upper_lim = 395
+
+slope_x = -59/305
+slope_y = 41/194
+sleep_ratio = 0.00897247
+
 
 # State Guide:
 # State 1: Search for object in image
@@ -121,6 +127,10 @@ wait_count = 0
 while(True):
     print("state="+str(state))
 
+    # tup = yolo.getClosestObject(vid)
+    # print(tup[0], tup[1])
+
+
     # the 'q' button is set as the
     # quitting button you may use any
     # desired button of your choice
@@ -189,6 +199,7 @@ while(True):
 
         # get center and dist of object closest to center
         center_X, center_Y, dist = yolo.getClosestObject(vid)
+        print('DIST: ', dist)
 
         # -- some unfinished logic to protect against if the detection cuts out for a few frames
         # if prev_X != -1:
@@ -200,46 +211,72 @@ while(True):
         # prev_X = center_X
         # prev_Y = center_Y
         # prev_dist = dist
+
+        #--TODO
+        #convert pixel difference to actual distance
         
         if (center_X != -1):
            object_found = True
            state = 2
-        elif (not object_found):
+        else:
             rotate_angle(-1)
             time.sleep(0.25)
-        elif (count > 30):
             object_found = False
-            count = 0
-        else:   
-            count += 1
+        
         
     elif state == 2:
+        count = 0
+        # if (check_arm_pos(center_X, center_Y)):
+        #     state = 3
+        #     print("Arm in correct position")
+        # else:
+        #     x_error = goal_x - center_X
+        #     y_error = goal_y - center_Y
+        #     print("Y error: " + str(y_error))
+
+        #     if (abs(x_error) > error_bound):
+        #         rotate_angle(x_error)
+        #         if (abs(x_error) < 2 * error_bound):
+        #             time.sleep(0.4)
+        #         else:
+        #             time.sleep(0.4)
+        #     if (abs(y_error) > error_bound):
+        #         move_radially(y_error)
+        #         if (abs(y_error) < 2 * error_bound):
+        #             time.sleep(0.5)
+        #         else:
+        #             time.sleep(0.5)
+            
+        #     state = 1
+
+        # print('diff', goal_x - center_X, goal_y - center_Y)
+        
+        delta_arm_x = (goal_x - center_X) * slope_x
+        delta_arm_y = (goal_y - center_Y) * slope_y
+        curr_pos = dexarm.get_current_position()
+        target_arm_x = curr_pos[0] + delta_arm_x
+        target_arm_y = curr_pos[1] + delta_arm_y
+        print(target_arm_x, target_arm_y)
+        if not valid_location(target_arm_x, target_arm_y):
+            print('Closest object is out of arm range')
+            state = 1
+
+        dexarm.fast_move_to(target_arm_x, target_arm_y, z_search)
+        time.sleep(max(3, dist * sleep_ratio))
+        center_X, center_Y, dist = yolo.getClosestObject(vid)
+        # time.sleep(0.5)
+        x_error = goal_x - center_X
+        y_error = goal_y - center_Y
         if (check_arm_pos(center_X, center_Y)):
             state = 3
-            print("Arm in correct position")
         else:
-            x_error = goal_x - center_X
-            y_error = goal_y - center_Y
-            print("Y error: " + str(y_error))
-
-            if (abs(x_error) > error_bound):
-                rotate_angle(x_error)
-                if (abs(x_error) < 2 * error_bound):
-                    time.sleep(0.4)
-                else:
-                    time.sleep(0.4)
-            if (abs(y_error) > error_bound):
-                move_radially(y_error)
-                if (abs(y_error) < 2 * error_bound):
-                    time.sleep(0.5)
-                else:
-                    time.sleep(0.5)
-            
             state = 1
+
     
     # Picks up the object and moves it to the drop zone
     elif state == 3:
         curr_pos = dexarm.get_current_position()
+        print(curr_pos)
         dexarm.soft_gripper_place()
         dexarm.fast_move_to(curr_pos[0], curr_pos[1], z_table)
         dexarm.soft_gripper_pick()
@@ -252,11 +289,10 @@ while(True):
         drop_x = input("Enter x location to drop at: ")
         drop_y = input("Enter y location to drop at: ")
         if(valid_location(drop_x, drop_y)):
-            dexarm.fast_move_to(drop_x, drop_y, z_trav)
+            dexarm.fast_move_to(drop_x, drop_y, z_search)
             dexarm.fast_move_to(drop_x, drop_y, z_table)
             dexarm.soft_gripper_place()
             dexarm.fast_move_to(drop_x, drop_y, z_trav)
-
             state = 5
         else:
             print("Invalid Dexarm Coordinates - please try again")
