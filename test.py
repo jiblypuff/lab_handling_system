@@ -1,112 +1,136 @@
 import cv2
 import numpy as np
+import os
+
+
+def img_to_polygons(image):
+    cordnt_list = []
+    centers_list = []
+    areas_list = []
+    rec_list = []
+    
+    frame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    frame = clahe.apply(frame)
+
+    # frame = cv2.GaussianBlur(frame, (21,21), 0)
+    frame = cv2.bilateralFilter(frame,5,75,75)
+
+    high_thresh, thresh_im = cv2.threshold(frame, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    lowThresh = 0.5*high_thresh
+
+    frame = cv2.Canny(frame, 50, 150)
+
+    frame = cv2.adaptiveThreshold(frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+
+    # frame = cv2.bilateralFilter(frame,5,150,150)
+
+    # high_thresh, thresh_im = cv2.threshold(frame, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # lowThresh = 0.5*high_thresh
+
+    # frame = cv2.Canny(frame, 50, 150)
+
+    out = os.path.join(outPut_dir, "edges.jpg")
+
+    cv2.imwrite(out, frame)
+
+    contours, hierarchy = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+    if not contours:
+        return cordnt_list, centers_list
+
+    contour_areas = [cv2.contourArea(contour) for contour in contours]
+    max_area = max(contour_areas)
+
+    # Extract coordinates of white regions
+    for contour in contours:
+        # epsilon = 0.5*cv2.arcLength(contour,True)
+        # contour = cv2.approxPolyDP(contour,epsilon,True)
+        area = cv2.contourArea(contour)
+
+        # Filter based on the area conditions
+        if area > 300:
+            coordinates = contour.squeeze().astype(float).tolist()
+            if len(coordinates) > 2:
+                M = cv2.moments(contour)
+                cX = int(M["m10"] / (M["m00"] + 1e-5))
+                cY = int(M["m01"] / (M["m00"] + 1e-5))
+                
+                # crdnts = [{'x': i[0], 'y': i[1]} for i in coordinates]
+                # rect = {}
+                # for i in cv2.boundingRect(contour):
+                #     rect = {'x': i[0], 'y': i[1], 'w': i[2], 'h': i[3]} 
+                # cordnt_list.append(crdnts)
+                rec_list.append(cv2.boundingRect(contour))
+                centers_list.append({'x': cX, 'y': cY})
+                areas_list.append(area)
+                    
+
+    # tup = (len(cordnt_list), len(centers_list), len(areas_list))
+    # print(tup)
+    return rec_list, centers_list, areas_list
 
 count = 0
 center_X = 0
 center_Y = 0
+path = os.getcwd()
+
+# Define input and output directories
+outPut_dir = os.path.join(path, 'output')
+os.makedirs(outPut_dir, exist_ok=True)
+
+vid = cv2.VideoCapture('videos/vid3.mov')
+
 while(True):
-    vid = cv2.VideoCapture(0)
+
     ret, frame = vid.read()
 
-    # print("Object found: " + str(object_found))
+    if not ret:
+        print("video ended")
+        break
 
-    # print('Original Dimensions: ', frame.shape)
-
-    scale_percent = 50
+    scale_percent = 100
     width = int(frame.shape[1] * scale_percent / 100)
     height = int(frame.shape[0] * scale_percent / 100)
     dim = (width, height)
 
-    # print(dim)
-
-    # cv2.imwrite("before"+str(count)+".jpg", frame)
-    # cv2.waitKey(0)
-
-    frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+    frame = cv2.resize(frame, dim , interpolation = cv2.INTER_AREA)
 
     frame_copy = frame.copy()
 
+    # Input and output file paths
+    fout = os.path.join(outPut_dir, "stream.jpg")
 
+    # Extract polygons from the image
+    rect, centers, areas = img_to_polygons(frame_copy)
 
-     # converting to LAB color space
-    lab= cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-    l_channel, a, b = cv2.split(lab)
+    # Get the height and width of the image
+    height, width = frame_copy.shape[:2]
 
-    # Applying CLAHE to L-channel
-    # feel free to try different values for the limit and grid size:
-    clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8,8))
-    cl = clahe.apply(l_channel)
+    # Create a black image with the same dimensions as the input
+    # black_image = np.zeros((height, width, 3), dtype=np.uint8)
 
-    # merge the CLAHE enhanced L-channel with the a and b channel
-    frame = cv2.merge((cl,a,b))
+    # Draw polygons on the black image
+    for i, rec in enumerate(rect):
+        # ply_list = [[pnt['x'], pnt['y']] for pnt in ply]
 
-    # Converting image from LAB Color model to BGR color spcae
-    frame = cv2.cvtColor(frame, cv2.COLOR_LAB2BGR)
+        # Define the vertices of the polygon
+        # vertices = np.array(ply_list, dtype=np.int32)
 
-    # cv2.imshow("enhanced", frame)
-    # cv2.waitKey(0)
+        cX = centers[i]['x']
+        cY = centers[i]['y']
+        # Draw the polygon on the black image
+        # cv2.polylines(frame_copy, [vertices], isClosed=True, color=(0, 255, 0), thickness=2)
+        x,y,w,h = rec
+        ar = w*h
+        if ar > 3200 and ar < 300000:
+            cv2.rectangle(frame_copy,(x,y),(x+w,y+h),(0,255,0),2)
+            cv2.circle(frame_copy, (cX, cY), 7, (255, 255, 255), -1)
+            cv2.putText(frame_copy, "area="+str(ar), (cX - 20, cY - 20), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-    frame = cv2.GaussianBlur(frame, (21,21), 2)
+    # Save the output image
+    cv2.imwrite(fout, frame_copy)
 
-    # cv2.imwrite("filtered_enhanced"+str(count)+".jpg", frame)
-
-    img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    thresh = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-
-    # cv2.imshow("gray", thresh)
-    # cv2.waitKey(0)
-
-    contours, hiearchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    # frame_copy = frame.copy()
-
-    areas = []
-    centers = []
-
-    for c in contours:
-        # find the area of the contour
-        areas.append(cv2.contourArea(c))
-        # compute the center of the contour
-        M = cv2.moments(c)
-        cX = int(M["m10"] / (M["m00"] + 1e-5))
-        cY = int(M["m01"] / (M["m00"] + 1e-5))
-
-        centers.append((cX, cY))
-
-    all_conts = {}
-
-    for i in range(len(areas)):
-        all_conts[i] = {'area' : areas[i], 'center' : centers[i]}
-
-    sorted_conts = sorted(all_conts.items(), key = lambda x:x[1]["area"], reverse = True)
-
-    # print(sorted_conts)
-
-    area_num = 0
-
-    conts_final = []
-
-    if(len(areas) != 0):
-        for i in range(len(areas)):
-            if(sorted_conts[i][1]['area'] * 1000 > sorted_conts[0][1]['area']
-               and sorted_conts[i][1]['area'] * 2 < sorted_conts[0][1]['area']):
-                center_X = sorted_conts[i][1]['center'][0]
-                center_Y = sorted_conts[i][1]['center'][1]
-                conts_final.append(contours[sorted_conts[i][0]])
-                area_num = area_num + 1
-
-
-    cv2.drawContours(frame_copy, conts_final, -1, (0, 255, 0), 2, cv2.LINE_AA)
-    cv2.imshow("frame"+str(count), frame_copy)
-    cv2.waitKey(0);
-    # cv2.imwrite("test"+str(count)+".jpg", frame_copy)
-    # cv2.waitKey(0)
-
-
-    print(count)
-    # break
-    # cv2.imshow("contour"+str(count)+".jpg", frame_copy)
-    # cv2.waitKey(0)
-    # print("CenterX: " + str(center_X))
-    # print("CenterY: " + str(center_Y))
-
-    count += 1
+    input()

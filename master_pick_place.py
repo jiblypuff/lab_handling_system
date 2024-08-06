@@ -6,34 +6,37 @@ from pydexarm import Dexarm
 import math
 import time
 
+import yolo
+
 z_search = 110
 
 # define a dexarm object to control the Dexarm
-dexarm = Dexarm("COM3")
+dexarm = Dexarm("/dev/tty.usbmodem2078399E47531")
 dexarm.go_home()
 curr_pos = dexarm.get_current_position()
+print('HOME: ', curr_pos)
 dexarm.move_to(curr_pos[0], curr_pos[1], z_search)
 dexarm.soft_gripper_nature()
 
 # define a video capture object
-vid = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+vid = cv2.VideoCapture(0)
 
 state = 1
 # represents the center of the object to be picked and placed
 center_X = 0
 center_Y = 0
 # represents where the object needs to be located in the frame to be picked properly
-goal_x = 322
-goal_y = 405
+goal_x = 1001
+goal_y = 310
 # represents the height where the air picker will be just above the table surface
-z_table = -52
+z_table = -110
 # represents the height at which the arm will traverse across the table
 z_trav = 50
 
 # search rad
 search_rad = 300
 
-error_bound = 8
+error_bound = 25
 object_found = False
 count = 0
 
@@ -41,6 +44,11 @@ x_lower_lim = -395
 x_upper_lim = 395
 y_lower_lim = 0
 y_upper_lim = 395
+
+slope_x = -59/305
+slope_y = 41/194
+sleep_ratio = 0.00897247
+
 
 # State Guide:
 # State 1: Search for object in image
@@ -111,8 +119,17 @@ def valid_location(drop_x, drop_y):
     else:
         return True
     
+prev_X = -1
+prev_Y = -1
+prev_dist = -1
+wait_count = 0
 
 while(True):
+    print("state="+str(state))
+
+    # tup = yolo.getClosestObject(vid)
+    # print(tup[0], tup[1])
+
 
     # the 'q' button is set as the
     # quitting button you may use any
@@ -123,102 +140,143 @@ while(True):
     elif state == 1:
         # Capture the video frame
         # by frame
-        ret, frame = vid.read()
+        # ret, frame = vid.read()
 
-        print("Object found: " + str(object_found))
+        # print("Object found: " + str(object_found))
 
         # print('Original Dimensions: ', frame.shape)
         
-        scale_percent = 100
-        width = int(frame.shape[1] * scale_percent / 100)
-        height = int(frame.shape[0] * scale_percent / 100)
-        dim = (width, height)
+        # scale_percent = 100
+        # width = int(frame.shape[1] * scale_percent / 100)
+        # height = int(frame.shape[0] * scale_percent / 100)
+        # dim = (width, height)
 
-        frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
-        frame = cv2.medianBlur(frame, 11)
+        # frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+        # frame = cv2.medianBlur(frame, 11)
         
-        img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        thresh = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        # img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # thresh = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
-        contours, hiearchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        frame_copy = frame.copy()
+        # contours, hiearchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # frame_copy = frame.copy()
 
-        areas = []
-        centers = []
+        # areas = []
+        # centers = []
 
-        for c in contours:
-            # find the area of the contour
-            areas.append(cv2.contourArea(c))
-            # compute the center of the contour
-            M = cv2.moments(c)
-            cX = int(M["m10"] / (M["m00"] + 1e-5))
-            cY = int(M["m01"] / (M["m00"] + 1e-5))
+        # for c in contours:
+        #     # find the area of the contour
+        #     areas.append(cv2.contourArea(c))
+        #     # compute the center of the contour
+        #     M = cv2.moments(c)
+        #     cX = int(M["m10"] / (M["m00"] + 1e-5))
+        #     cY = int(M["m01"] / (M["m00"] + 1e-5))
 
-            centers.append((cX, cY))
+        #     centers.append((cX, cY))
 
-        all_conts = {}
+        # all_conts = {}
 
-        for i in range(len(areas)):
-            all_conts[i] = {'area' : areas[i], 'center' : centers[i]}
+        # for i in range(len(areas)):
+        #     all_conts[i] = {'area' : areas[i], 'center' : centers[i]}
 
-        sorted_conts = sorted(all_conts.items(), key = lambda x:x[1]["area"], reverse = True)
+        # sorted_conts = sorted(all_conts.items(), key = lambda x:x[1]["area"], reverse = True)
 
 
-        area_num = 0
+        # area_num = 0
 
-        if(len(areas) != 0):
-            for i in range(len(areas)):
-                if(sorted_conts[i][1]['area'] * 100 > sorted_conts[0][1]['area']
-                   and sorted_conts[i][1]['area'] * 2 < sorted_conts[0][1]['area']):
-                    center_X = sorted_conts[i][1]['center'][0]
-                    center_Y = sorted_conts[i][1]['center'][1]
-                    cv2.drawContours(frame_copy, contours, sorted_conts[i][0], (0, 255, 0), 2, cv2.LINE_AA)
-                    area_num = area_num + 1
+        # if(len(areas) != 0):
+        #     for i in range(len(areas)):
+        #         if(sorted_conts[i][1]['area'] * 400 > sorted_conts[0][1]['area']
+        #            and sorted_conts[i][1]['area'] * 2 < sorted_conts[0][1]['area']):
+        #             center_X = sorted_conts[i][1]['center'][0]
+        #             center_Y = sorted_conts[i][1]['center'][1]
+        #             cv2.drawContours(frame_copy, contours, sorted_conts[i][0], (0, 255, 0), 2, cv2.LINE_AA)
+        #             area_num = area_num + 1
 
-        cv2.imshow("Contour Drawing", frame_copy)
-        print("CenterX: " + str(center_X))
-        print("CenterY: " + str(center_Y))
-        print(dexarm.get_current_position())
+        # cv2.imshow("Contour Drawing", frame_copy)
+        # print("CenterX: " + str(center_X))
+        # print("CenterY: " + str(center_Y))
+        # print(dexarm.get_current_position())
+
+        # get center and dist of object closest to center
+        center_X, center_Y, dist = yolo.getClosestObject(vid)
+        print('DIST: ', dist)
+
+        # -- some unfinished logic to protect against if the detection cuts out for a few frames
+        # if prev_X != -1:
+        #     if (center_X == -1) or dist - prev_dist > 300 and count < 10:
+        #         center_X = prev_X
+        #         center_Y = prev_Y
+        #         count += 1
+
+        # prev_X = center_X
+        # prev_Y = center_Y
+        # prev_dist = dist
+
+        #--TODO
+        #convert pixel difference to actual distance
         
-        if (area_num > 0):
-            object_found = True
-            state = 2
-        elif (not object_found):
+        if (center_X != -1):
+           object_found = True
+           state = 2
+        else:
             rotate_angle(-1)
             time.sleep(0.25)
-        elif (count > 30):
             object_found = False
-            count = 0
-        else:   
-            count += 1
+        
         
     elif state == 2:
+        count = 0
+        # if (check_arm_pos(center_X, center_Y)):
+        #     state = 3
+        #     print("Arm in correct position")
+        # else:
+        #     x_error = goal_x - center_X
+        #     y_error = goal_y - center_Y
+        #     print("Y error: " + str(y_error))
+
+        #     if (abs(x_error) > error_bound):
+        #         rotate_angle(x_error)
+        #         if (abs(x_error) < 2 * error_bound):
+        #             time.sleep(0.4)
+        #         else:
+        #             time.sleep(0.4)
+        #     if (abs(y_error) > error_bound):
+        #         move_radially(y_error)
+        #         if (abs(y_error) < 2 * error_bound):
+        #             time.sleep(0.5)
+        #         else:
+        #             time.sleep(0.5)
+            
+        #     state = 1
+
+        # print('diff', goal_x - center_X, goal_y - center_Y)
+        
+        delta_arm_x = (goal_x - center_X) * slope_x
+        delta_arm_y = (goal_y - center_Y) * slope_y
+        curr_pos = dexarm.get_current_position()
+        target_arm_x = curr_pos[0] + delta_arm_x
+        target_arm_y = curr_pos[1] + delta_arm_y
+        print(target_arm_x, target_arm_y)
+        if not valid_location(target_arm_x, target_arm_y):
+            print('Closest object is out of arm range')
+            state = 1
+
+        dexarm.fast_move_to(target_arm_x, target_arm_y, z_search)
+        time.sleep(max(3, dist * sleep_ratio))
+        center_X, center_Y, dist = yolo.getClosestObject(vid)
+        # time.sleep(0.5)
+        x_error = goal_x - center_X
+        y_error = goal_y - center_Y
         if (check_arm_pos(center_X, center_Y)):
             state = 3
-            print("Arm in correct position")
         else:
-            x_error = goal_x - center_X
-            y_error = goal_y - center_Y
-            print("Y error: " + str(y_error))
-
-            if (abs(x_error) > error_bound):
-                rotate_angle(x_error)
-                if (abs(x_error) < 2 * error_bound):
-                    time.sleep(0.4)
-                else:
-                    time.sleep(0.4)
-            if (abs(y_error) > error_bound):
-                move_radially(y_error)
-                if (abs(y_error) < 2 * error_bound):
-                    time.sleep(0.5)
-                else:
-                    time.sleep(0.5)
-            
             state = 1
+
     
     # Picks up the object and moves it to the drop zone
     elif state == 3:
         curr_pos = dexarm.get_current_position()
+        print(curr_pos)
         dexarm.soft_gripper_place()
         dexarm.fast_move_to(curr_pos[0], curr_pos[1], z_table)
         dexarm.soft_gripper_pick()
@@ -231,11 +289,10 @@ while(True):
         drop_x = input("Enter x location to drop at: ")
         drop_y = input("Enter y location to drop at: ")
         if(valid_location(drop_x, drop_y)):
-            dexarm.fast_move_to(drop_x, drop_y, z_trav)
+            dexarm.fast_move_to(drop_x, drop_y, z_search)
             dexarm.fast_move_to(drop_x, drop_y, z_table)
             dexarm.soft_gripper_place()
             dexarm.fast_move_to(drop_x, drop_y, z_trav)
-
             state = 5
         else:
             print("Invalid Dexarm Coordinates - please try again")
