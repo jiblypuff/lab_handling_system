@@ -6,7 +6,7 @@ from pydexarm import Dexarm
 import math
 import time
 
-import yolo
+import yoloLib
 
 z_search = 110
 
@@ -62,6 +62,11 @@ def check_arm_pos(x_coord, y_coord):
         if ((y_coord > goal_y - error_bound) and (y_coord < goal_y + error_bound)):
             return True
     return False
+
+def movement_finished(x_coord, y_coord, x_target, y_target):
+    print('cur pos: (', x_coord, ', ', y_coord, ')')
+    print('target pos: (', x_target, ', ', y_target, ')')
+    return abs(x_coord - x_target < 2) and abs(y_coord - y_target < 2)
 
 def move_radially(dist):
     print("Distance: " + str(dist))
@@ -124,6 +129,14 @@ prev_Y = -1
 prev_dist = -1
 wait_count = 0
 
+check_input = input("Do you want to detect transparent objects? (y/n): ").lower()
+while not (check_input == 'y' or check_input == 'n'):
+    print("please input the letters y or n")
+    check_input = input("Do you want to detect transparent objects? (y/n): ").lower()
+
+check_transparent = check_input == 'y'
+
+
 while(True):
     print("state="+str(state))
 
@@ -138,82 +151,9 @@ while(True):
         break
 	
     elif state == 1:
-        # Capture the video frame
-        # by frame
-        # ret, frame = vid.read()
-
-        # print("Object found: " + str(object_found))
-
-        # print('Original Dimensions: ', frame.shape)
-        
-        # scale_percent = 100
-        # width = int(frame.shape[1] * scale_percent / 100)
-        # height = int(frame.shape[0] * scale_percent / 100)
-        # dim = (width, height)
-
-        # frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
-        # frame = cv2.medianBlur(frame, 11)
-        
-        # img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # thresh = cv2.adaptiveThreshold(img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-
-        # contours, hiearchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        # frame_copy = frame.copy()
-
-        # areas = []
-        # centers = []
-
-        # for c in contours:
-        #     # find the area of the contour
-        #     areas.append(cv2.contourArea(c))
-        #     # compute the center of the contour
-        #     M = cv2.moments(c)
-        #     cX = int(M["m10"] / (M["m00"] + 1e-5))
-        #     cY = int(M["m01"] / (M["m00"] + 1e-5))
-
-        #     centers.append((cX, cY))
-
-        # all_conts = {}
-
-        # for i in range(len(areas)):
-        #     all_conts[i] = {'area' : areas[i], 'center' : centers[i]}
-
-        # sorted_conts = sorted(all_conts.items(), key = lambda x:x[1]["area"], reverse = True)
-
-
-        # area_num = 0
-
-        # if(len(areas) != 0):
-        #     for i in range(len(areas)):
-        #         if(sorted_conts[i][1]['area'] * 400 > sorted_conts[0][1]['area']
-        #            and sorted_conts[i][1]['area'] * 2 < sorted_conts[0][1]['area']):
-        #             center_X = sorted_conts[i][1]['center'][0]
-        #             center_Y = sorted_conts[i][1]['center'][1]
-        #             cv2.drawContours(frame_copy, contours, sorted_conts[i][0], (0, 255, 0), 2, cv2.LINE_AA)
-        #             area_num = area_num + 1
-
-        # cv2.imshow("Contour Drawing", frame_copy)
-        # print("CenterX: " + str(center_X))
-        # print("CenterY: " + str(center_Y))
-        # print(dexarm.get_current_position())
-
         # get center and dist of object closest to center
-        center_X, center_Y, dist = yolo.getClosestObject(vid)
+        center_X, center_Y, dist = yoloLib.getClosestObject(vid, check_transparent)
         print('DIST: ', dist)
-
-        # -- some unfinished logic to protect against if the detection cuts out for a few frames
-        # if prev_X != -1:
-        #     if (center_X == -1) or dist - prev_dist > 300 and count < 10:
-        #         center_X = prev_X
-        #         center_Y = prev_Y
-        #         count += 1
-
-        # prev_X = center_X
-        # prev_Y = center_Y
-        # prev_dist = dist
-
-        #--TODO
-        #convert pixel difference to actual distance
         
         if (center_X != -1):
            object_found = True
@@ -262,8 +202,11 @@ while(True):
             state = 1
 
         dexarm.fast_move_to(target_arm_x, target_arm_y, z_search)
-        time.sleep(max(3, dist * sleep_ratio))
-        center_X, center_Y, dist = yolo.getClosestObject(vid)
+        while(not movement_finished(curr_pos[0], curr_pos[1], target_arm_x, target_arm_y)): 
+            curr_pos = dexarm.get_current_position()
+        time.sleep(2)
+
+        center_X, center_Y, dist = yoloLib.getClosestObject(vid, check_transparent)
         # time.sleep(0.5)
         x_error = goal_x - center_X
         y_error = goal_y - center_Y
