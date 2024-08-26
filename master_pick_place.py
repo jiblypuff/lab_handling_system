@@ -6,7 +6,7 @@ from pydexarm import Dexarm
 import math
 import time
 
-import yoloLib
+import yolo
 
 z_search = 110
 
@@ -30,6 +30,7 @@ goal_x = 1001
 goal_y = 310
 # represents the height where the air picker will be just above the table surface
 z_table = -110
+# z_table = -120
 # represents the height at which the arm will traverse across the table
 z_trav = 50
 
@@ -64,8 +65,8 @@ def check_arm_pos(x_coord, y_coord):
     return False
 
 def movement_finished(x_coord, y_coord, x_target, y_target):
-    print('cur pos: (', x_coord, ', ', y_coord, ')')
-    print('target pos: (', x_target, ', ', y_target, ')')
+    # print('cur pos: (', x_coord, ', ', y_coord, ')')
+    # print('target pos: (', x_target, ', ', y_target, ')')
     return abs(x_coord - x_target < 2) and abs(y_coord - y_target < 2)
 
 def move_radially(dist):
@@ -136,6 +137,14 @@ while not (check_input == 'y' or check_input == 'n'):
 
 check_transparent = check_input == 'y'
 
+def detectObjects(cap, check_transparent):
+    center_X, center_Y, dist = -1, -1 ,-1
+    for _ in range(10):
+        center_X, center_Y, dist = yolo.getClosestObject(vid, check_transparent)
+        if(center_X != -1): break
+
+    return center_X, center_Y, dist
+
 
 while(True):
     print("state="+str(state))
@@ -152,7 +161,8 @@ while(True):
 	
     elif state == 1:
         # get center and dist of object closest to center
-        center_X, center_Y, dist = yoloLib.getClosestObject(vid, check_transparent)
+        center_X, center_Y, dist = detectObjects(vid, check_transparent)
+
         print('DIST: ', dist)
         
         if (center_X != -1):
@@ -166,30 +176,6 @@ while(True):
         
     elif state == 2:
         count = 0
-        # if (check_arm_pos(center_X, center_Y)):
-        #     state = 3
-        #     print("Arm in correct position")
-        # else:
-        #     x_error = goal_x - center_X
-        #     y_error = goal_y - center_Y
-        #     print("Y error: " + str(y_error))
-
-        #     if (abs(x_error) > error_bound):
-        #         rotate_angle(x_error)
-        #         if (abs(x_error) < 2 * error_bound):
-        #             time.sleep(0.4)
-        #         else:
-        #             time.sleep(0.4)
-        #     if (abs(y_error) > error_bound):
-        #         move_radially(y_error)
-        #         if (abs(y_error) < 2 * error_bound):
-        #             time.sleep(0.5)
-        #         else:
-        #             time.sleep(0.5)
-            
-        #     state = 1
-
-        # print('diff', goal_x - center_X, goal_y - center_Y)
         
         delta_arm_x = (goal_x - center_X) * slope_x
         delta_arm_y = (goal_y - center_Y) * slope_y
@@ -206,7 +192,7 @@ while(True):
             curr_pos = dexarm.get_current_position()
         time.sleep(2)
 
-        center_X, center_Y, dist = yoloLib.getClosestObject(vid, check_transparent)
+        center_X, center_Y, dist = detectObjects(vid, check_transparent)
         # time.sleep(0.5)
         x_error = goal_x - center_X
         y_error = goal_y - center_Y

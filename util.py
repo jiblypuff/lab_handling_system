@@ -1,10 +1,16 @@
-import os
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
 import cv2
-import sys
+from ultralytics import YOLOv10
+import supervision as sv
+import numpy as np
+import matplotlib.pyplot as plt
+import discorpy.post.postprocessing as post
+import os
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
+
+# fisheye parameters
+xcenter = 785.3054074949058
+ycenter = 530.4032340121979
+factors = [ 1.00851460e+00, -1.63425112e-05, -3.77548357e-07, -7.29162454e-11, 1.96865934e-13]
 
 sam_checkpoint = "sam_vit_h_4b8939.pth"
 model_type = "vit_h"
@@ -15,6 +21,15 @@ sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
 sam.to(device=device)
 
 mask_generator = SamAutomaticMaskGenerator(sam)
+
+
+def unwarp(img):
+    img_corrected = np.copy(img)
+    for i in range(img.shape[-1]):
+        img_corrected[:, :, i] = post.unwarp_image_backward(img[:, :, i], xcenter,
+                                                            ycenter, factors)
+    return img_corrected
+
 
 def show_anns(anns):
     if len(anns) == 0:
@@ -48,38 +63,3 @@ def segment(img):
     # plt.box(on=None)
     fig.canvas.draw()
     return cv2.resize(cv2.cvtColor(np.array(fig.canvas.renderer.buffer_rgba()), cv2.COLOR_RGBA2BGR), (h,w))
-
-
-# video_dir = "/Users/jibly/Documents/labHandling/lab_handling_system/videos"
-# output_base = "/Users/jibly/Documents/labHandling/lab_handling_system/output/sam"
-
-# videos = os.listdir(video_dir)
-
-# count = 0
-
-# for vid in videos:
-#     if not vid.lower().endswith((".mov", ".mp4")): continue
-#     vid_path = os.path.join(video_dir, vid)
-#     cap = cv2.VideoCapture(vid_path)
-
-#     while True:
-#         ret, frame = cap.read()
-#         if not ret: break
-
-#         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-#         masks = mask_generator.generate(frame)
-
-#         fig, ax = plt.subplots(figsize=(20, 20))
-#         ax.imshow(frame)
-#         show_anns(masks)
-#         ax.axis('off')
-
-#         # Save the figure to the specified directory
-#         output_path = os.path.join(output_base, "frame"+str(count)+".png")
-#         plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
-#         count+=1
-
-#     cap.release()
-
-# cv2.destroyAllWindows()
