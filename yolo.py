@@ -66,10 +66,10 @@ def getClosestObject(cap, trans=False):
 
         label = box[5]['class_name']
 
-        if label == 'scissors' or label == 'screwdriver':
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-            polygons, centers, areas = util.img_to_polygons(frame[y1:y2, x1:x2, :])
-            util.drawContours(annotated_image, polygons, centers, areas, (x1,y1))
+        # if label == 'scissors' or label == 'screwdriver':
+        #     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        #     polygons, centers, areas = util.img_to_polygons(frame[y1:y2, x1:x2, :])
+        #     util.drawContours(annotated_image, polygons, centers, areas, (x1,y1))
 
         cur_dist = np.sqrt((cx - goal_x)**2 + (cy-goal_y)**2)
         if(cur_dist < min_dist):
@@ -77,13 +77,13 @@ def getClosestObject(cap, trans=False):
             closest_cent = (int(cx),int(cy))
             conf = box[2]
     
-    cv2.circle(annotated_image, (goal_x, goal_y), 12, (255, 0, 0), -1)
-    cv2.putText(annotated_image, "goal", (goal_x - 20, goal_y - 20), 
-    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    # cv2.circle(annotated_image, (goal_x, goal_y), 12, (255, 0, 0), -1)
+    # cv2.putText(annotated_image, "goal", (goal_x - 20, goal_y - 20), 
+    # cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     cv2.circle(annotated_image, closest_cent, 7, (255, 0, 0), -1)
-    cv2.putText(annotated_image, "conf="+conf, (int(closest_cent[0]) - 20, int(closest_cent[1]) - 20), 
-    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    # cv2.putText(annotated_image, "conf="+str(conf), (int(closest_cent[0]) - 20, int(closest_cent[1]) - 20), 
+    # cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
     
     cv2.imwrite('/Users/jibly/Documents/labHandling/lab_handling_system/output/stream.jpg', annotated_image)
     
